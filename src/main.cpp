@@ -21,6 +21,9 @@
 #include <QCommandLineParser>
 #include <QDebug>
 #include <QFile>
+#include <QTextStream>
+
+#include <cstdio>
 
 #ifdef ORANGE
 #include "qmljsreformatter.h"
@@ -35,11 +38,13 @@ int main(int argc, char *argv[])
     app.setApplicationVersion("1.0");
 
     QCommandLineParser parser;
-    parser.setApplicationDescription("QML JS reformatter");
+    parser.setApplicationDescription("QML/JavaScript reformatter.\n"
+                                     "\n"
+                                     "If destination is omitted, format result will be writen to standard output.");
     parser.addHelpOption();
     parser.addVersionOption();
     parser.addPositionalArgument("source", "Source file.");
-    parser.addPositionalArgument("destination", "Destination file.");
+    parser.addPositionalArgument("destination", "Destination file.", "[destination]");
 #ifdef ORANGE
     // A boolean option with multiple names (-s, --split)
     QCommandLineOption splitOption(QStringList() << "s" << "split", "Split the long lines.");
@@ -49,17 +54,16 @@ int main(int argc, char *argv[])
 
     const QStringList args = parser.positionalArguments();
 
-    if (args.length() < 2) {
+    if (args.length() < 1) {
 #ifdef ORANGE
-        qWarning() << "Usage:" << argv[0] << "[-s|--split] <input-file> <output-file>";
+        qWarning() << "Usage:" << argv[0] << "[-s|--split] <input-file> [<output-file>]";
 #else
-        qWarning() << "Usage:" << argv[0] << "<input-file> <output-file>";
+        qWarning() << "Usage:" << argv[0] << "<input-file> [<output-file>]";
 #endif
         return 1;
     }
 
     QString inputFile = args.at(0);
-    QString outputFile = args.at(1);
 
     QString content;
 
@@ -94,16 +98,23 @@ int main(int argc, char *argv[])
     QString formattedContent = QmlJS::reformat(doc);
 #endif
 
-    QFile outFile(outputFile);
+    if (args.length() >= 2) {
+        QString outputFile = args.at(1);
+        QFile outFile(outputFile);
 
-    if (outFile.open(QIODevice::WriteOnly)) {
-        QTextStream outs(&outFile);
-        outs << formattedContent;
-        outFile.close();
+        if (outFile.open(QIODevice::WriteOnly)) {
+            QTextStream outs(&outFile);
+            outs << formattedContent;
+            outFile.close();
+        }
+        else {
+            qWarning() << "Error: couldn't open output file";
+            return 4;
+        }
     }
     else {
-        qWarning() << "Error: couldn't open output file";
-        return 4;
+        QTextStream outs(stdout);
+        outs << formattedContent;
     }
 
     return 0;
