@@ -40,11 +40,15 @@ int main(int argc, char *argv[])
     QCommandLineParser parser;
     parser.setApplicationDescription("QML/JavaScript reformatter.\n"
                                      "\n"
-                                     "If destination is omitted, format result will be writen to standard output.");
+                                     "If destination is omitted and -i is not used, format result will be\n"
+                                     "writen to standard output.");
     parser.addHelpOption();
     parser.addVersionOption();
     parser.addPositionalArgument("source", "Source file.");
-    parser.addPositionalArgument("destination", "Destination file.", "[destination]");
+    parser.addPositionalArgument("destination", "Destination file (ignored with -i).", "[destination]");
+    // A boolean option with multiple names (-i, --in-place)
+    QCommandLineOption inPlaceOption(QStringList() << "i" << "in-place", "Inplace format source file.");
+    parser.addOption(inPlaceOption);
 #ifdef ORANGE
     // A boolean option with multiple names (-s, --split)
     QCommandLineOption splitOption(QStringList() << "s" << "split", "Split the long lines.");
@@ -57,16 +61,17 @@ int main(int argc, char *argv[])
     if (args.length() < 1) {
 #ifdef ORANGE
         qWarning() << "Usage:" << argv[0] << "[-s|--split] <input-file> [<output-file>]";
+        qWarning() << " or:  " << argv[0] << "[-i|--in-place] [-s|--split] <input-file>";
 #else
         qWarning() << "Usage:" << argv[0] << "<input-file> [<output-file>]";
+        qWarning() << " or:  " << argv[0] << "[-i|--in-place] <input-file>";
 #endif
         return 1;
     }
 
-    QString inputFile = args.at(0);
-
     QString content;
 
+    QString inputFile = args.at(0);
     QFile inFile(inputFile);
     if (inFile.open(QIODevice::ReadOnly)) {
         QTextStream ins(&inFile);
@@ -98,7 +103,18 @@ int main(int argc, char *argv[])
     QString formattedContent = QmlJS::reformat(doc);
 #endif
 
-    if (args.length() >= 2) {
+    if (parser.isSet(inPlaceOption)) {
+        if (inFile.open(QIODevice::WriteOnly)) {
+            QTextStream outs(&inFile);
+            outs << formattedContent;
+            inFile.close();
+        }
+        else {
+            qWarning() << "Error: couldn't reopen input file for writing";
+            return 4;
+        }
+    }
+    else if (args.length() >= 2) {
         QString outputFile = args.at(1);
         QFile outFile(outputFile);
 
